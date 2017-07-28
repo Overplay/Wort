@@ -53,6 +53,21 @@ public class OGSettings {
     }
 
 
+    /*
+ * Verbose/Debug Mode
+ */
+    public static String getLastSSID() {
+        return getStringFromPrefs("lastSSID", null);
+    };
+
+    public static void setLastSSID(String ssid) {
+        putStringToPrefs("lastSSID", ssid);
+    };
+
+    public static boolean hasWiFiSetup(){
+        return getLastSSID() != null;
+    }
+
 
     /*
     * Verbose/Debug Mode

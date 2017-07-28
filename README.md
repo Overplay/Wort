@@ -1,4 +1,5 @@
-#WORT: Upgrade Checker and WiFi Config for Bucanero
+WORT: Upgrade Checker and WiFi Config for Bucanero
+==========================
 
 Wort provides two simple functions for the OG1 System:
 - It checks for upgrades to the Bucanero APK hosted on Bellini-DM

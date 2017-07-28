@@ -9,12 +9,14 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
+import android.os.CountDownTimer;
 import android.os.Environment;
 import android.os.Handler;
 import android.support.v4.app.ActivityCompat;
@@ -66,7 +68,6 @@ public class BootActivity extends Activity {
     public static final int INST_APK_REQ_CODE = 44;
 
 
-    ProgressBar spinner;
     ImageView logo;
     TextView message;
     Button wifiButton;
@@ -91,7 +92,7 @@ public class BootActivity extends Activity {
     private Handler mHandler = new Handler();
     private String mWiFiSSID;
 
-    private enum UIState {REQUEST_PERMISSIONS, START, NO_WIFI, NO_CONNECTION_2_OGC, NO_MAINFRAME_INSTALLED, UPGRADE_MAINFRAME, WAIT_2_START, PACKAGE_ERROR}
+    private enum UIState {WIFI_SETTLE, REQUEST_PERMISSIONS, START, NO_WIFI, NO_CONNECTION_2_OGC, NO_MAINFRAME_INSTALLED, UPGRADE_MAINFRAME, WAIT_2_START, PACKAGE_ERROR}
 
     private UIState mUiState;
 
@@ -100,6 +101,9 @@ public class BootActivity extends Activity {
 
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_boot);
+
+        Intent i = getIntent();
+        boolean freshBoot = i.getBooleanExtra("FRESH_BOOTY", false);
 
         mSpinner = (ProgressBar) findViewById(R.id.progressBar);
         mSpinner.setVisibility(View.INVISIBLE);
@@ -131,7 +135,15 @@ public class BootActivity extends Activity {
         });
 
 
-        runCheckSequence();
+        // This check is looking to see if this box has ever connected to a WiFi network and if it
+        // has, we assume we are coming out of boot.
+        if (freshBoot){
+            mUiState = UIState.WIFI_SETTLE;
+            updateUi();
+        } else {
+            runCheckSequence();
+        }
+
     }
 
     private void runCheckSequence() {
@@ -139,11 +151,12 @@ public class BootActivity extends Activity {
         mUiState = UIState.START;
         updateUi();
 
-        if (!getAndOfAllPermissions()){
+        if (!getAndOfAllPermissions()) {
             mUiState = UIState.REQUEST_PERMISSIONS;
-            updateUi();;
+            updateUi();
+            ;
             requestPermissions();
-        } else  if (!checkWiFiNetwork()) {
+        } else if (!checkWiFiNetwork()) {
             Log.d(TAG, "~~~ No wifi link!");
             mUiState = UIState.NO_WIFI;
             updateUi();
@@ -158,13 +171,13 @@ public class BootActivity extends Activity {
         }
 
     }
+
     @Override
     public void onRequestPermissionsResult(int requestCode,
                                            String permissions[], int[] grantResults) {
         runCheckSequence();
 
     }
-
 
 
     private void updateUi() {
@@ -174,8 +187,31 @@ public class BootActivity extends Activity {
             public void run() {
 
                 switch (mUiState) {
+
+                    case WIFI_SETTLE:
+                        wifiButton.setVisibility(View.INVISIBLE);
+                        message.setText("Starting Up");
+                        message2.setText("Waiting for WiFi to Settle");
+                        new CountDownTimer(30000, 1000) {
+
+                            public void onTick(long millisUntilFinished) {
+                                message2.setText("" + millisUntilFinished / 1000);
+                                if (checkWiFiNetwork()){
+                                    runCheckSequence();
+                                    this.cancel();
+                                }
+                            }
+
+                            public void onFinish() {
+                                runCheckSequence();
+                            }
+                        }.start();
+                        break;
+
+                        // needed only > API 19
                     case REQUEST_PERMISSIONS:
                         wifiButton.setText("SETUP WIFI");
+                        wifiButton.setVisibility(View.VISIBLE);
                         upgradeButton.setVisibility(View.INVISIBLE);
                         message.setText("Initial Permissions Setup");
                         message2.setText("Answer Yes To All Prompts!");
@@ -183,6 +219,7 @@ public class BootActivity extends Activity {
 
                     case NO_WIFI:
                         wifiButton.setText("SETUP WIFI");
+                        wifiButton.setVisibility(View.VISIBLE);
                         upgradeButton.setVisibility(View.INVISIBLE);
                         message.setText("WiFi is NOT Connected!");
                         message2.setText("Please click the SETUP WIFI button to continue");
@@ -190,6 +227,7 @@ public class BootActivity extends Activity {
 
                     case NO_CONNECTION_2_OGC:
                         wifiButton.setText("SETUP WIFI");
+                        wifiButton.setVisibility(View.VISIBLE);
                         upgradeButton.setVisibility(View.INVISIBLE);
                         message.setText("Could Not Reach Ourglass Cloud!");
                         message2.setText("Please make sure your WiFi settings are correct and that you have an active internet connection");
@@ -197,6 +235,7 @@ public class BootActivity extends Activity {
 
                     case NO_MAINFRAME_INSTALLED:
                         wifiButton.setText("CHANGE WIFI SETTINGS");
+                        wifiButton.setVisibility(View.VISIBLE);
                         upgradeButton.setVisibility(View.INVISIBLE);
                         message.setText("Downloading OG Software");
                         message2.setText("Please chill a bit");
@@ -204,7 +243,8 @@ public class BootActivity extends Activity {
                         break;
 
                     case UPGRADE_MAINFRAME:
-                        wifiButton.setText("CHANGE WIFI SETTINGS (CURRENTLY ON: " + mWiFiSSID + ")");
+                        wifiButton.setText("CHANGE WIFI SETTINGS ( " + mWiFiSSID + " )");
+                        wifiButton.setVisibility(View.VISIBLE);
                         upgradeButton.setVisibility(View.VISIBLE);
                         message.setText("Software Upgrade Available, Click Below to Install");
                         message2.setText("");
@@ -213,6 +253,7 @@ public class BootActivity extends Activity {
 
                     case PACKAGE_ERROR:
                         wifiButton.setText("CHANGE WIFI SETTINGS (CURRENTLY ON: " + mWiFiSSID + ")");
+                        wifiButton.setVisibility(View.VISIBLE);
                         upgradeButton.setVisibility(View.VISIBLE);
                         message.setText("ERROR: No Software Package Found!");
                         message2.setText("Check Dev/Production Setting");
@@ -221,6 +262,7 @@ public class BootActivity extends Activity {
 
                     case WAIT_2_START:
                         wifiButton.setText("CHANGE WIFI SETTINGS (CURRENTLY ON: " + mWiFiSSID + ")");
+                        wifiButton.setVisibility(View.VISIBLE);
                         upgradeButton.setVisibility(View.INVISIBLE);
                         message.setText("Everything looking good!");
                         message2.setText("");
@@ -309,6 +351,7 @@ public class BootActivity extends Activity {
         mCurrentWiFiInfo = mWifiManager.getConnectionInfo();
         if (mWiFiConnected) {
             mWiFiSSID = getSSID();
+            OGSettings.setLastSSID(mWiFiSSID);
         } else {
             mWiFiSSID = null;
         }
@@ -543,11 +586,11 @@ public class BootActivity extends Activity {
         runCheckSequence();
     }
 
-    private void spinnerVisible(final boolean isVisible){
+    private void spinnerVisible(final boolean isVisible) {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                mSpinner.setVisibility( isVisible ? View.VISIBLE : View.INVISIBLE );
+                mSpinner.setVisibility(isVisible ? View.VISIBLE : View.INVISIBLE);
             }
         });
     }
@@ -574,7 +617,7 @@ public class BootActivity extends Activity {
         DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
         request.setDescription("Retrieving latest awesome.");
         request.setTitle("OG Code Feeatch");
-        request.setNotificationVisibility(View.VISIBLE);
+        request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
 
         //set destination
         request.setDestinationUri(uri);
@@ -587,13 +630,17 @@ public class BootActivity extends Activity {
         BroadcastReceiver onComplete = new BroadcastReceiver() {
             public void onReceive(Context ctxt, Intent intent) {
 
-                spinnerVisible(false);
-
-                Intent install = new Intent(Intent.ACTION_VIEW);
-                //install.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                install.setDataAndType(uri,
-                        manager.getMimeTypeForDownloadedFile(downloadId));
-                startActivityForResult(install, 44);
+                mHandler.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        spinnerVisible(false);
+                        Intent install = new Intent(Intent.ACTION_VIEW);
+                        //install.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                        install.setDataAndType(uri,
+                                manager.getMimeTypeForDownloadedFile(downloadId));
+                        startActivityForResult(install, 44);
+                    }
+                }, 1000);
 
                 unregisterReceiver(this);
                 //finish();
@@ -602,6 +649,44 @@ public class BootActivity extends Activity {
         //register receiver for when .apk download is compete
         //register receiver for when .apk download is compete
         registerReceiver(onComplete, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
+
+        mHandler.post(new Runnable() {
+
+            @Override
+            public void run() {
+
+                DownloadManager.Query q = new DownloadManager.Query();
+                q.setFilterById(downloadId);
+
+                Cursor cursor = manager.query(q);
+                cursor.moveToFirst();
+
+                int bytes_downloaded = cursor.getInt(cursor
+                        .getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
+
+                int bytes_total = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
+
+                final double dl_progress = Math.floor(((double) bytes_downloaded / (double) bytes_total) * 100.0);
+
+                runOnUiThread(new Runnable() {
+
+                    @Override
+                    public void run() {
+
+                        mSpinner.setProgress((int) dl_progress);
+
+                    }
+                });
+
+                Log.d(TAG, bytes_downloaded + " of " + bytes_total);
+                if (cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)) != DownloadManager.STATUS_SUCCESSFUL) {
+                    mHandler.postDelayed(this, 250);
+                }
+
+                cursor.close();
+
+            }
+        });
     }
 
 
