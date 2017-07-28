@@ -497,6 +497,10 @@ public class BootActivity extends Activity {
             toast("Switching to Beta Package");
         }
 
+        Intent intent = new Intent(Intent.ACTION_DELETE);
+        intent.setData(Uri.parse("package:"+MAIN_APK_NAME));
+        startActivityForResult(intent, 66);
+
         downloadAndInstallLatestApk();
     }
 
@@ -583,7 +587,13 @@ public class BootActivity extends Activity {
     @Override
     public void onActivityResult(int reqCode, int resCode, Intent i) {
         Log.d(TAG, "Back from req: " + reqCode);
-        runCheckSequence();
+
+        if (reqCode==66){
+            // delete of pakage, now we need to get latest
+            downloadAndInstallLatestApk();
+        } else {
+            runCheckSequence();
+        }
     }
 
     private void spinnerVisible(final boolean isVisible) {
