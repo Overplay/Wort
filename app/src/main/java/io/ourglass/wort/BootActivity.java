@@ -137,7 +137,7 @@ public class BootActivity extends Activity {
 
         // This check is looking to see if this box has ever connected to a WiFi network and if it
         // has, we assume we are coming out of boot.
-        if (freshBoot){
+        if (freshBoot) {
             mUiState = UIState.WIFI_SETTLE;
             updateUi();
         } else {
@@ -196,7 +196,7 @@ public class BootActivity extends Activity {
 
                             public void onTick(long millisUntilFinished) {
                                 message2.setText("" + millisUntilFinished / 1000);
-                                if (checkWiFiNetwork()){
+                                if (checkWiFiNetwork()) {
                                     runCheckSequence();
                                     this.cancel();
                                 }
@@ -208,7 +208,7 @@ public class BootActivity extends Activity {
                         }.start();
                         break;
 
-                        // needed only > API 19
+                    // needed only > API 19
                     case REQUEST_PERMISSIONS:
                         wifiButton.setText("SETUP WIFI");
                         wifiButton.setVisibility(View.VISIBLE);
@@ -234,12 +234,29 @@ public class BootActivity extends Activity {
                         break;
 
                     case NO_MAINFRAME_INSTALLED:
-                        wifiButton.setText("CHANGE WIFI SETTINGS");
-                        wifiButton.setVisibility(View.VISIBLE);
+                        //wifiButton.setText("CHANGE WIFI SETTINGS");
+                        wifiButton.setVisibility(View.INVISIBLE);
                         upgradeButton.setVisibility(View.INVISIBLE);
                         message.setText("Downloading OG Software");
                         message2.setText("Please chill a bit");
-                        downloadAndInstallLatestApk();
+                        // This timer is here to sneak in hidden keystrokes
+                        new CountDownTimer(5000, 1000) {
+
+                            public void onTick(long millisUntilFinished) {
+                                message2.setText("" + millisUntilFinished / 1000);
+                            }
+
+                            public void onFinish() {
+                                message2.setText("Please wait");
+                                runOnUiThread(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        downloadAndInstallLatestApk();
+                                    }
+                                });
+                            }
+                        }.start();
+
                         break;
 
                     case UPGRADE_MAINFRAME:
@@ -498,7 +515,7 @@ public class BootActivity extends Activity {
         }
 
         Intent intent = new Intent(Intent.ACTION_DELETE);
-        intent.setData(Uri.parse("package:"+MAIN_APK_NAME));
+        intent.setData(Uri.parse("package:" + MAIN_APK_NAME));
         startActivityForResult(intent, 66);
 
         downloadAndInstallLatestApk();
@@ -588,7 +605,7 @@ public class BootActivity extends Activity {
     public void onActivityResult(int reqCode, int resCode, Intent i) {
         Log.d(TAG, "Back from req: " + reqCode);
 
-        if (reqCode==66){
+        if (reqCode == 66) {
             // delete of pakage, now we need to get latest
             downloadAndInstallLatestApk();
         } else {
@@ -607,7 +624,7 @@ public class BootActivity extends Activity {
 
     public void downloadAndInstallApk(String newApkFilename) {
 
-        toast("Fetching latest " + OGSettings.getMainframeApkType() + "code from " + OGSettings.getBelliniDMMode() + " server");
+        toast("Fetching latest " + OGSettings.getMainframeApkType() + " code from " + OGSettings.getBelliniDMMode() + " server");
         spinnerVisible(true);
 
         String destination = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/";

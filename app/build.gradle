@@ -7,7 +7,7 @@ android {
         applicationId "io.ourglass.wort"
         minSdkVersion 19
         targetSdkVersion 19
-        versionCode 1
+        versionCode 3
         versionName "1.0"
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
     }
@@ -29,6 +29,6 @@ dependencies {
     compile 'com.squareup.okhttp3:okhttp:3.2.0'
     compile 'net.danlew:android.joda:2.9.5.1'
     compile 'org.jdeferred:jdeferred-android-aar:1.2.6'
-    compile 'com.sromku:simple-storage:1.2.1'
+    //compile 'com.sromku:simple-storage:1.2.1'
     testCompile 'junit:junit:4.12'
 }
