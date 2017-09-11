@@ -7,6 +7,10 @@ import android.util.Log;
 
 import net.danlew.android.joda.JodaTimeAndroid;
 
+import java.util.ArrayList;
+
+import io.ourglass.wort.api.ShellExecutor;
+import io.ourglass.wort.api.ShellExecutor2;
 import io.ourglass.wort.networking.OGHeaderInterceptor;
 import okhttp3.OkHttpClient;
 
@@ -37,6 +41,20 @@ public class WortApplication extends Application {
         sharedContext = getApplicationContext();
 
         JodaTimeAndroid.init(this);
+
+        new ShellExecutor2(new ShellExecutor2.ShellExecutorListener2() {
+            @Override
+            public void results(ArrayList<String> results) {
+                Log.d(TAG, results.toString());
+            }
+        }).exec("touch /mnt/sdcard/hello.txt");
+
+        new ShellExecutor(new ShellExecutor.ShellExecutorListener() {
+            @Override
+            public void results(String results) {
+                Log.d(TAG, results.toString());
+            }
+        }).exec("touch /mnt/sdcard/hello2.txt");
 
     }
 
