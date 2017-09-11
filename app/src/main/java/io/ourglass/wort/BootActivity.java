@@ -87,12 +87,15 @@ public class BootActivity extends Activity {
     private WifiInfo mCurrentWiFiInfo;
     private TextView message2;
     private ProgressBar mSpinner;
+    private TextView textViewTimer;
 
     private int mCountdown;
     private Handler mHandler = new Handler();
     private String mWiFiSSID;
 
-    private enum UIState {WIFI_SETTLE, REQUEST_PERMISSIONS, START, NO_WIFI, NO_CONNECTION_2_OGC, NO_MAINFRAME_INSTALLED, UPGRADE_MAINFRAME, WAIT_2_START, PACKAGE_ERROR}
+    private enum UIState { WIFI_SETTLE, REQUEST_PERMISSIONS, START,
+                           NO_WIFI_NO_MAINFRAME, NO_WIFI_HAVE_MAINFRAME, NO_CONNECTION_2_OGC, NO_MAINFRAME_INSTALLED, UPGRADE_MAINFRAME,
+                            DOWNLOADING, REQUEST_INSTALL, WAIT_2_START, PACKAGE_ERROR}
 
     private UIState mUiState;
 
@@ -101,6 +104,9 @@ public class BootActivity extends Activity {
 
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_boot);
+
+        // Temp while Treb fixes certs
+        //OGSettings.setBelliniDMMode("dev");
 
         Intent i = getIntent();
         boolean freshBoot = i.getBooleanExtra("FRESH_BOOTY", false);
@@ -113,6 +119,10 @@ public class BootActivity extends Activity {
 
         message2 = (TextView) findViewById(R.id.textViewMessage2);
         message2.setText("");
+
+        textViewTimer = (TextView) findViewById(R.id.textViewTimer);
+        textViewTimer.setText("");
+
 
         wifiButton = (Button) findViewById(R.id.buttonWiFi);
         wifiButton.setOnClickListener(new View.OnClickListener() {
@@ -152,15 +162,24 @@ public class BootActivity extends Activity {
         updateUi();
 
         if (!getAndOfAllPermissions()) {
+
+            // This would only run if we switch to an Android 6 target, or permissions get messed
+            // with in settings.
+            Log.d(TAG, "Requesting permissions on screen");
             mUiState = UIState.REQUEST_PERMISSIONS;
             updateUi();
-            ;
             requestPermissions();
+
         } else if (!checkWiFiNetwork()) {
+
+            // We have no WiFi.
             Log.d(TAG, "~~~ No wifi link!");
-            mUiState = UIState.NO_WIFI;
+            mUiState = checkMainAppInstalled() ? UIState.NO_WIFI_HAVE_MAINFRAME : UIState.NO_WIFI_NO_MAINFRAME;
             updateUi();
+
         } else {
+
+            // We have WiFi
             Log.d(TAG, "+++ We have WiFi, checking if any package at all.");
             if (!checkMainAppInstalled()) {
                 mUiState = UIState.NO_MAINFRAME_INSTALLED;
@@ -168,6 +187,7 @@ public class BootActivity extends Activity {
             } else {
                 checkForUpgrade();
             }
+
         }
 
     }
@@ -195,10 +215,10 @@ public class BootActivity extends Activity {
                         new CountDownTimer(30000, 1000) {
 
                             public void onTick(long millisUntilFinished) {
-                                message2.setText("" + millisUntilFinished / 1000);
+                                textViewTimer.setText("" + millisUntilFinished / 1000);
                                 if (checkWiFiNetwork()) {
-                                    runCheckSequence();
                                     this.cancel();
+                                    runCheckSequence();
                                 }
                             }
 
@@ -217,12 +237,15 @@ public class BootActivity extends Activity {
                         message2.setText("Answer Yes To All Prompts!");
                         break;
 
-                    case NO_WIFI:
+                    case NO_WIFI_HAVE_MAINFRAME:
+                        // In this state, there may be a temporary networking problem in the venue,
+                        // so if Mainframe is installed, we should run it so the TV is not DOA.
                         wifiButton.setText("SETUP WIFI");
                         wifiButton.setVisibility(View.VISIBLE);
                         upgradeButton.setVisibility(View.INVISIBLE);
                         message.setText("WiFi is NOT Connected!");
-                        message2.setText("Please click the SETUP WIFI button to continue");
+                        message2.setText("Please click the SETUP WIFI button to continue, or wait for Ourglass to start.");
+                        outroCountdown(30);
                         break;
 
                     case NO_CONNECTION_2_OGC:
@@ -231,6 +254,9 @@ public class BootActivity extends Activity {
                         upgradeButton.setVisibility(View.INVISIBLE);
                         message.setText("Could Not Reach Ourglass Cloud!");
                         message2.setText("Please make sure your WiFi settings are correct and that you have an active internet connection");
+                        if (checkMainAppInstalled()){
+                            outroCountdown(30);
+                        }
                         break;
 
                     case NO_MAINFRAME_INSTALLED:
@@ -238,16 +264,16 @@ public class BootActivity extends Activity {
                         wifiButton.setVisibility(View.INVISIBLE);
                         upgradeButton.setVisibility(View.INVISIBLE);
                         message.setText("Downloading OG Software");
-                        message2.setText("Please chill a bit");
+                        message2.setText("Pour yourself a cold one...");
                         // This timer is here to sneak in hidden keystrokes
                         new CountDownTimer(5000, 1000) {
 
                             public void onTick(long millisUntilFinished) {
-                                message2.setText("" + millisUntilFinished / 1000);
+                                textViewTimer.setText("" + millisUntilFinished / 1000);
                             }
 
                             public void onFinish() {
-                                message2.setText("Please wait");
+                                textViewTimer.setText("Please wait");
                                 runOnUiThread(new Runnable() {
                                     @Override
                                     public void run() {
@@ -271,10 +297,16 @@ public class BootActivity extends Activity {
                     case PACKAGE_ERROR:
                         wifiButton.setText("CHANGE WIFI SETTINGS (CURRENTLY ON: " + mWiFiSSID + ")");
                         wifiButton.setVisibility(View.VISIBLE);
-                        upgradeButton.setVisibility(View.VISIBLE);
-                        message.setText("ERROR: No Software Package Found!");
+                        upgradeButton.setVisibility(View.INVISIBLE);
+                        message.setText("Upgrade Check Error");
                         message2.setText("Check Dev/Production Setting");
-                        outroCountdown(30);
+
+                        if (checkMainAppInstalled()){
+                            outroCountdown(60);
+                        }
+                        else {
+                            textViewTimer.setText("I'm stuck. No main OG app installed, no upgrade package available, or network issue.");
+                        }
                         break;
 
                     case WAIT_2_START:
@@ -285,6 +317,21 @@ public class BootActivity extends Activity {
                         message2.setText("");
                         outroCountdown(15);
                         break;
+
+                    case REQUEST_INSTALL:
+                        wifiButton.setVisibility(View.INVISIBLE);
+                        upgradeButton.setVisibility(View.INVISIBLE);
+                        message.setText("Waiting for Upgrade");
+                        message2.setText("");
+                        break;
+
+                    case DOWNLOADING:
+                        wifiButton.setVisibility(View.INVISIBLE);
+                        upgradeButton.setVisibility(View.INVISIBLE);
+                        message.setText("Downloading Updated OG Software");
+                        message2.setText("Pour yourself a cold one...");
+                        break;
+
                 }
 
 
@@ -321,7 +368,7 @@ public class BootActivity extends Activity {
         mHandler.postDelayed(new Runnable() {
             @Override
             public void run() {
-                message2.setText("Starting in " + mCountdown + " seconds");
+                textViewTimer.setText("Starting in " + mCountdown + " seconds");
                 mCountdown--;
                 if (mCountdown >= 0) {
                     mHandler.postDelayed(this, 1000);
@@ -501,6 +548,11 @@ public class BootActivity extends Activity {
             OGSettings.setBelliniDMMode("dev");
             toast("Using Dev OG Cloud Servers");
         }
+
+        // Stop outro timer if running
+        mHandler.removeCallbacksAndMessages(null);
+        textViewTimer.setText("");
+        runCheckSequence();
     }
 
     private void nextApkType() {
@@ -529,13 +581,18 @@ public class BootActivity extends Activity {
                     public void onDone(JSONObject result) {
 
                         if (result.optInt("versionCode", 0) == 0) {
-                            toast("No package found");
+                            toast("No package found on " + OGSettings.getBelliniDMMode() + " server!");
+                            mUiState = UIState.PACKAGE_ERROR;
+                            updateUi();
                         } else {
                             try {
                                 String fname = result.getString("filename");
                                 downloadAndInstallApk(fname);
                             } catch (JSONException e) {
                                 toast("Release package info missing filename!");
+                                toast("Package found on " + OGSettings.getBelliniDMMode() + " server was missing file name!");
+                                mUiState = UIState.PACKAGE_ERROR;
+                                updateUi();
                             }
                         }
 
@@ -544,7 +601,9 @@ public class BootActivity extends Activity {
                 .fail(new FailCallback<Exception>() {
                     @Override
                     public void onFail(Exception result) {
-                        toast("Error Getting Latest Package");
+                        toast("Error Getting Latest Package. Network Failure.");
+                        mUiState = UIState.PACKAGE_ERROR;
+                        updateUi();
                     }
                 });
     }
@@ -606,7 +665,7 @@ public class BootActivity extends Activity {
         Log.d(TAG, "Back from req: " + reqCode);
 
         if (reqCode == 66) {
-            // delete of pakage, now we need to get latest
+            // delete of package, now we need to get latest
             downloadAndInstallLatestApk();
         } else {
             runCheckSequence();
@@ -622,98 +681,126 @@ public class BootActivity extends Activity {
         });
     }
 
-    public void downloadAndInstallApk(String newApkFilename) {
+    public void downloadAndInstallApk(final String newApkFilename) {
 
-        toast("Fetching latest " + OGSettings.getMainframeApkType() + " code from " + OGSettings.getBelliniDMMode() + " server");
-        spinnerVisible(true);
-
-        String destination = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/";
-        String fileName = "ogpackage.apk";
-        destination += fileName;
-        final Uri uri = Uri.parse("file://" + destination);
-
-        //Delete update file if exists
-        File file = new File(destination);
-        if (file.exists())
-            file.delete();
-
-        //get url of app on server
-        String url = OGSettings.getBelliniDMAddress() + "/updates/" + newApkFilename;
-
-        //set downloadmanager
-        DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
-        request.setDescription("Retrieving latest awesome.");
-        request.setTitle("OG Code Feeatch");
-        request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-
-        //set destination
-        request.setDestinationUri(uri);
-
-        // get download service and enqueue file
-        final DownloadManager manager = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
-        final long downloadId = manager.enqueue(request);
-
-        //set BroadcastReceiver to install app when .apk is downloaded
-        BroadcastReceiver onComplete = new BroadcastReceiver() {
-            public void onReceive(Context ctxt, Intent intent) {
-
-                mHandler.postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-                        spinnerVisible(false);
-                        Intent install = new Intent(Intent.ACTION_VIEW);
-                        //install.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                        install.setDataAndType(uri,
-                                manager.getMimeTypeForDownloadedFile(downloadId));
-                        startActivityForResult(install, 44);
-                    }
-                }, 1000);
-
-                unregisterReceiver(this);
-                //finish();
-            }
-        };
-        //register receiver for when .apk download is compete
-        //register receiver for when .apk download is compete
-        registerReceiver(onComplete, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
-
-        mHandler.post(new Runnable() {
-
+        // The UI stuff in here needs to be on main thread, so make sure it is promoted.
+        runOnUiThread(new Runnable() {
             @Override
             public void run() {
 
-                DownloadManager.Query q = new DownloadManager.Query();
-                q.setFilterById(downloadId);
+                if (mUiState!=UIState.DOWNLOADING) {
 
-                Cursor cursor = manager.query(q);
-                cursor.moveToFirst();
+                    mUiState = UIState.DOWNLOADING;
+                    updateUi();
 
-                int bytes_downloaded = cursor.getInt(cursor
-                        .getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
 
-                int bytes_total = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
+                        }
+                    });
+                    textViewTimer.setText("Package name: " + newApkFilename);
+                    toast("Fetching latest " + OGSettings.getMainframeApkType() + " code from " + OGSettings.getBelliniDMMode() + " server");
+                    spinnerVisible(true);
 
-                final double dl_progress = Math.floor(((double) bytes_downloaded / (double) bytes_total) * 100.0);
+                    String destination = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/";
+                    String fileName = "ogpackage.apk";
+                    destination += fileName;
+                    final Uri uri = Uri.parse("file://" + destination);
 
-                runOnUiThread(new Runnable() {
+                    //Delete update file if exists
+                    File file = new File(destination);
+                    if (file.exists())
+                        file.delete();
 
-                    @Override
-                    public void run() {
+                    //get url of app on server
+                    String url = OGSettings.getBelliniDMAddress() + "/updates/" + newApkFilename;
 
-                        mSpinner.setProgress((int) dl_progress);
+                    //set downloadmanager
+                    DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
+                    request.setDescription("Retrieving latest awesome.");
+                    request.setTitle("OG Code Feeatch");
+                    request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
 
-                    }
-                });
+                    //set destination
+                    request.setDestinationUri(uri);
 
-                Log.d(TAG, bytes_downloaded + " of " + bytes_total);
-                if (cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)) != DownloadManager.STATUS_SUCCESSFUL) {
-                    mHandler.postDelayed(this, 250);
+                    // get download service and enqueue file
+                    final DownloadManager manager = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
+                    final long downloadId = manager.enqueue(request);
+
+                    //set BroadcastReceiver to install app when .apk is downloaded
+                    BroadcastReceiver onComplete = new BroadcastReceiver() {
+                        public void onReceive(Context ctxt, Intent intent) {
+
+                            mHandler.postDelayed(new Runnable() {
+                                @Override
+                                public void run() {
+                                    spinnerVisible(false);
+                                    Intent install = new Intent(Intent.ACTION_VIEW);
+                                    //install.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                                    install.setDataAndType(uri,
+                                            manager.getMimeTypeForDownloadedFile(downloadId));
+                                    mUiState = UIState.REQUEST_INSTALL;
+                                    updateUi();
+                                    startActivityForResult(install, 44);
+                                }
+                            }, 1000);
+
+                            unregisterReceiver(this);
+                            //finish();
+                        }
+                    };
+                    //register receiver for when .apk download is compete
+                    //register receiver for when .apk download is compete
+                    registerReceiver(onComplete, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
+
+                    mHandler.post(new Runnable() {
+
+                        @Override
+                        public void run() {
+
+                            DownloadManager.Query q = new DownloadManager.Query();
+                            q.setFilterById(downloadId);
+
+                            Cursor cursor = manager.query(q);
+                            cursor.moveToFirst();
+
+                            int bytes_downloaded = cursor.getInt(cursor
+                                    .getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
+
+                            int bytes_total = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
+
+                            final double dl_progress = Math.floor(((double) bytes_downloaded / (double) bytes_total) * 100.0);
+
+                            runOnUiThread(new Runnable() {
+
+                                @Override
+                                public void run() {
+
+                                    mSpinner.setProgress((int) dl_progress);
+
+                                }
+                            });
+
+                            Log.d(TAG, bytes_downloaded + " of " + bytes_total);
+                            if (cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)) != DownloadManager.STATUS_SUCCESSFUL) {
+                                mHandler.postDelayed(this, 250);
+                            }
+
+                            cursor.close();
+
+                        }
+                    });
+
+                } else {
+                    Log.e(TAG, "Call to download while downloading! Ignored!!");
+                    return;
                 }
-
-                cursor.close();
 
             }
         });
+
     }
 
 
@@ -729,11 +816,7 @@ public class BootActivity extends Activity {
                         int cloudRev = result.optInt("versionCode", 0);
                         int localRev = getMainAppVersionCode();
 
-                        if (cloudRev == 0) {
-                            toast("No package found on OG Cloud!!");
-                            mUiState = UIState.PACKAGE_ERROR;
-
-                        } else if (cloudRev > localRev) {
+                       if (cloudRev > localRev) {
                             try {
                                 mUpgradeFilename = result.getString("filename");
                                 mUiState = UIState.UPGRADE_MAINFRAME;
@@ -741,9 +824,14 @@ public class BootActivity extends Activity {
                                 toast("Release package info missing filename!");
                                 mUiState = UIState.PACKAGE_ERROR;
                             }
+                        } else if (cloudRev == 0) {
+                            toast("No package found on OG Cloud!!");
+                            mUiState = UIState.PACKAGE_ERROR;
+
                         } else {
                             mUiState = UIState.WAIT_2_START;
                         }
+
                         updateUi();
                     }
                 })
