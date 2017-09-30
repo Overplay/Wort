@@ -39,6 +39,7 @@ import org.json.JSONObject;
 import java.io.File;
 
 import io.ourglass.wort.application.WortApplication;
+import io.ourglass.wort.networking.DHCPDControl;
 import io.ourglass.wort.networking.DeferredRequest;
 import io.ourglass.wort.settings.OGSettings;
 import io.ourglass.wort.support.OGAnimations;
@@ -144,6 +145,8 @@ public class BootActivity extends Activity {
             }
         });
 
+
+        DHCPDControl.startUdhcpd();
 
         // This check is looking to see if this box has ever connected to a WiFi network and if it
         // has, we assume we are coming out of boot.
