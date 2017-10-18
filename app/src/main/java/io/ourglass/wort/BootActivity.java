@@ -63,7 +63,7 @@ public class BootActivity extends Activity {
     public static final boolean SKIP_WIFI_CHECK = true; //use this in emulator
 
 
-    public static final int COUNTDOWN_SECS = 30;
+    public static final int WIFI_SETTLE_TIME = 90;
     public static final String MAIN_APK_NAME = "io.ourglass.bucanero";
     public static final int WIFI_SETUP_REQ_CODE = 99;  // I got 99 problems but WiFi ain't one
     public static final int INST_APK_REQ_CODE = 44;
@@ -215,7 +215,7 @@ public class BootActivity extends Activity {
                         wifiButton.setVisibility(View.INVISIBLE);
                         message.setText("Starting Up");
                         message2.setText("Waiting for WiFi to Settle");
-                        new CountDownTimer(30000, 1000) {
+                        new CountDownTimer(WIFI_SETTLE_TIME * 1000, 1000) {
 
                             public void onTick(long millisUntilFinished) {
                                 textViewTimer.setText("" + millisUntilFinished / 1000);
