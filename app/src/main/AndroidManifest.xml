@@ -31,6 +31,10 @@
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen">
 
+        <service
+            android:name=".services.MonitorService"
+            android:exported="false" />
+
         <activity android:name=".BootActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -49,6 +53,7 @@
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
 
         </receiver>

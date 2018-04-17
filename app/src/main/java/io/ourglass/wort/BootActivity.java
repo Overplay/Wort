@@ -41,6 +41,7 @@ import java.io.File;
 import io.ourglass.wort.application.WortApplication;
 import io.ourglass.wort.networking.DHCPDControl;
 import io.ourglass.wort.networking.DeferredRequest;
+import io.ourglass.wort.services.MonitorService;
 import io.ourglass.wort.settings.OGSettings;
 import io.ourglass.wort.support.OGAnimations;
 
@@ -68,6 +69,8 @@ public class BootActivity extends Activity {
     public static final int WIFI_SETUP_REQ_CODE = 99;  // I got 99 problems but WiFi ain't one
     public static final int INST_APK_REQ_CODE = 44;
 
+    long lastHeardFromBuc = 0;
+    boolean watchdogEnabled = true;
 
     ImageView logo;
     TextView message;
@@ -287,9 +290,8 @@ public class BootActivity extends Activity {
                         }.start();
 
                         break;
-
                     case UPGRADE_MAINFRAME:
-                        wifiButton.setText("CHANGE WIFI SETTINGS ( " + mWiFiSSID + " )");
+                        setWiFiButtonOKText();
                         wifiButton.setVisibility(View.VISIBLE);
                         upgradeButton.setVisibility(View.VISIBLE);
                         message.setText("Software Upgrade Available, Click Below to Install");
@@ -298,7 +300,7 @@ public class BootActivity extends Activity {
                         break;
 
                     case PACKAGE_ERROR:
-                        wifiButton.setText("CHANGE WIFI SETTINGS (CURRENTLY ON: " + mWiFiSSID + ")");
+                        setWiFiButtonOKText();
                         wifiButton.setVisibility(View.VISIBLE);
                         upgradeButton.setVisibility(View.INVISIBLE);
                         message.setText("Upgrade Check Error");
@@ -313,7 +315,7 @@ public class BootActivity extends Activity {
                         break;
 
                     case WAIT_2_START:
-                        wifiButton.setText("CHANGE WIFI SETTINGS (CURRENTLY ON: " + mWiFiSSID + ")");
+                        setWiFiButtonOKText();
                         wifiButton.setVisibility(View.VISIBLE);
                         upgradeButton.setVisibility(View.INVISIBLE);
                         message.setText("Everything looking good!");
@@ -341,6 +343,10 @@ public class BootActivity extends Activity {
             }
         });
 
+    }
+
+    private void setWiFiButtonOKText(){
+        wifiButton.setText("WiFi Connected: " + mWiFiSSID + "  -   Click if you want to change ");
     }
 
 
@@ -649,14 +655,12 @@ public class BootActivity extends Activity {
             }
         }, 1000);
 
+        final Intent intent = new Intent(this, MonitorService.class);
+
         logo.postDelayed(new Runnable() {
             @Override
             public void run() {
-                Intent launchIntent = getPackageManager().getLaunchIntentForPackage(MAIN_APK_NAME);
-                if (launchIntent != null) {
-                    startActivity(launchIntent);
-                    finish();
-                }
+                startService(intent);
             }
         }, 1500);
 
@@ -848,6 +852,7 @@ public class BootActivity extends Activity {
                 });
 
     }
+
 
 }
 
